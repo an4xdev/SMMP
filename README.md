@@ -106,14 +106,14 @@ graph LR;
     type: serviceRegisterRequest
     messageID: integer
     typeOfService: string
-    plugsConfiguration: configuration of plugs[port, is out/in]
+    plugsConfiguration: configuration of plugs
     |Agent
     Agent-->
     |2. Forwarding request to Manager.
     type: serviceRegisterRequest
     messageID: integer
     typeOfService: string
-    plugsConfiguration: configuration of plugs[port, is out/in]
+    plugsConfiguration: configuration of plugs
     |Manager
     Manager-->
     |3. Sending response to Agent.
@@ -183,7 +183,7 @@ graph LR
         agentPort: port
         serviceName: A
         serviceID: i
-        plugConfiguration: configuration of plugs[port, is out/in]
+        plugConfiguration: configuration of plugs
     |Agent
     Agent-->
         |3. Response to Agent.
