@@ -4,8 +4,11 @@ Implementation of protocol for managing a service mesh.
 ## Individual services
 
 [Manager description](/Manager/README.md "Manager")
+
 [Agent description](/Agent/README.md "Agent")
+
 [Api Gateway description](/ApiGateway/README.md "Api Gateway")
+
 [Description of services that are using protocole](/Service/README.md "Services")
 
 ## Short summary
