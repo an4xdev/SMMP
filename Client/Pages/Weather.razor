@@ -1,0 +1,31 @@
+﻿@page "/weather"
+@inject HttpClient Http
+
+<PageTitle>Weather</PageTitle>
+
+<h1>Weather</h1>
+
+<p>This component demonstrates fetching data from the server.</p>
+
+
+<div>
+    @if (foo != string.Empty)
+    {
+        <p>@foo</p>
+    }
+    else
+    {
+        <p>Loading</p>
+    }
+</div>
+
+
+@code {
+    string foo = string.Empty;
+
+    protected override async Task OnInitializedAsync()
+    {
+        foo = await Http.GetStringAsync("api");
+    }
+
+}
