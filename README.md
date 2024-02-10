@@ -101,7 +101,7 @@ Implementation of protocol for managing a service mesh.
 Graphs was made via: **[Mermaid](https://mermaid.js.org/)**
 
 ### Graph of registration services that work from the beginning and aren't launched via Agent
-
+````
 ```mermaid
 graph LR;
     Service-->
@@ -131,7 +131,7 @@ graph LR;
     status: status code
     |Service
 ```
-
+````
 ### Graph of service notification that it has processed data
 
 ```mermaid
