@@ -8,9 +8,9 @@ import java.util.Collections;
 import java.util.HashMap;
 import java.util.LinkedList;
 import java.util.concurrent.Callable;
-import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
 import java.util.concurrent.LinkedBlockingQueue;
 
 import org.json.JSONObject;
@@ -22,7 +22,7 @@ public class ServiceApi extends Thread implements IServiceApi {
     private LinkedList<JSONObject> sendList;
     private LinkedList<JSONObject> receiveList;
 
-    private HashMap<String, LinkedBlockingQueue<Runnable>> connections;
+    private HashMap<String, LinkedBlockingQueue<ServiceToService>> connections;
     private HashMap<String, Integer> plugs;
 
     private Socket socketToAgent;
@@ -48,12 +48,13 @@ public class ServiceApi extends Thread implements IServiceApi {
 
         for (String serviceType : plugsJSON.keySet()) {
             plugs.put(serviceType, plugsJSON.getInt(serviceType));
+            connections.put(serviceType, new LinkedBlockingQueue<>());
         }
 
         // start run method
         this.start();
 
-        // send message about that service was started via sendMessage
+        // TODO: send message about that service was started via sendMessage
         sendMessage(null);
     }
 
@@ -69,68 +70,52 @@ public class ServiceApi extends Thread implements IServiceApi {
         sendList.add(message);
     }
 
-    // TODO:: change to Future<JSONObject> and process exceptions in application?
-    public JSONObject receivceResponse(JSONObject identifier) {
-        JSONObject response = null;
-        try {
-            response = executorService.submit(new Callable<JSONObject>() {
-                @Override
-                public JSONObject call() {
-                    JSONObject foo = new JSONObject();
-                    foo.put("foo", 5);
-                    return foo;
-                }
-            }).get();
+    public Future<JSONObject> receivceResponse(JSONObject identifier) {
+        return executorService.submit(new Callable<JSONObject>() {
+            @Override
+            public JSONObject call() {
+                JSONObject temp = receiveList.poll();
+                // TODO: change to checking if identifier is the same
+                // if not add to receiveList
+                return temp;
+            }
+        });
 
-        } catch (InterruptedException e) {
-            // TODO: Auto-generated catch block
-            e.printStackTrace();
-        } catch (ExecutionException e) {
-            // TODO: Auto-generated catch block
-            e.printStackTrace();
-        }
-
-        return response;
     }
 
     private void connect(String typeOfService) {
-        // send request to mamanger
+        // TODO: send request to mamanger
         sendMessage(null);
         // receive message
-        JSONObject response = receivceResponse(null);
+        Future<JSONObject> response = receivceResponse(null);
         // connect
-        LinkedBlockingQueue<Runnable> connectionsQueue = connections.getOrDefault(typeOfService,
-                new LinkedBlockingQueue<Runnable>());
+        LinkedBlockingQueue<ServiceToService> connectionsQueue = connections.get(typeOfService);
 
-        // TODO:: add class thats implements Runnable where is has plug number, once are initialized sockets, have method that send and recevice data, and have busy flag
         connectionsQueue.offer(null);
-        // send confirmation
+        // TODO: send confirmation
         sendMessage(null);
     }
 
     private void disconnect(int plug) {
+        connections.values().stream()
+                .flatMap(LinkedBlockingQueue<ServiceToService>::stream)
+                .filter(r -> r.getPlug() == plug).findFirst().ifPresent(r -> r.disconnect());
 
-        // TODO:: change to get plug and call close method them remove?
-
-        // go by all runnable and check where plug is the same as parameter, interrupt and send message
-        connections.values().removeIf(b -> b.size() == 1);
+        connections.values().forEach(l -> l.removeIf(r -> r.getPlug() == plug));
     }
 
-    private void close() {
-
-        // TODO:: call close method
+    private void close() throws InterruptedException {
 
         // close all runnable connections and send messages
-        connections.values().forEach(f -> System.out.println(f.size()));
+        connections.values().forEach(l -> l.forEach(r -> r.disconnect()));
 
-        // set connections to NULL?
-
-        // send message about closing
-
+        // TODO: send message about closing
         sendMessage(null);
 
-        // close application
+        // wait 5 seconds
+        Thread.sleep(5000);
 
+        // close application
         System.exit(0);
     }
 
@@ -140,6 +125,7 @@ public class ServiceApi extends Thread implements IServiceApi {
             while (!Thread.currentThread().isInterrupted()) {
                 try {
                     String response = readerFromAgent.readLine();
+                    // TODO: check if request is from Manager and process
                     receiveList.add(new JSONObject(response));
                     Thread.sleep(10);
                 } catch (IOException e) {
@@ -155,20 +141,14 @@ public class ServiceApi extends Thread implements IServiceApi {
             while (!Thread.currentThread().isInterrupted()) {
                 if (sendList.size() != 0) {
                     JSONObject temp = sendList.poll();
-                    // check if this message is to Manager if isn't add to queue
-
-                    // check if connected to specific service(get queue via name), if is poll from queue, process and send request
-
-                    // if poll is empty or all threads are busy connect to Service?
-
                     // TODO:: add checking if message is to Manager
-                    // if is to Manager send to Agent
                     writerToAgent.println(temp.toString());
                     writerToAgent.flush();
                 }
                 try {
                     Thread.sleep(10);
                 } catch (InterruptedException e) {
+                    // TODO: Auto-generated catch block
                     e.printStackTrace();
                 }
             }
