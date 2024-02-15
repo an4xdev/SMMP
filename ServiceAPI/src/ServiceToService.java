@@ -13,7 +13,8 @@ import org.json.JSONObject;
 
 public class ServiceToService implements Runnable {
 
-    private int plug;
+    private int sourceServicePlug;
+    private int destServicePlug;
     private String typeOfService;
 
     private LinkedList<JSONObject> sendList;
@@ -27,33 +28,66 @@ public class ServiceToService implements Runnable {
 
     private AtomicBoolean isBusy;
 
-    public ServiceToService(int plug, String typeOfService, LinkedList<JSONObject> sendList,
-            LinkedList<JSONObject> receiveList, JSONObject dataToConnect) throws IOException {
+    private ServiceApi serviceApi;
+
+    public ServiceToService(int sourceServicePlug, String typeOfService, LinkedList<JSONObject> sendList,
+            LinkedList<JSONObject> receiveList, JSONObject dataToConnect, ServiceApi serviceApi) throws IOException {
         executorService = Executors.newVirtualThreadPerTaskExecutor();
-        this.plug = plug;
+        this.sourceServicePlug = sourceServicePlug;
         this.typeOfService = typeOfService;
         this.sendList = sendList;
         this.receiveList = receiveList;
-        initializeSocket(null);
+        this.serviceApi = serviceApi;
+        initializeSocket(dataToConnect);
         this.run();
     }
 
     private void initializeSocket(JSONObject dataToConnect) throws IOException {
-        socketToService = new Socket("localhost", 1234, InetAddress.getLoopbackAddress(), plug);
+        socketToService = new Socket(
+                InetAddress.getByAddress(
+                        dataToConnect.getString("destServiceNetwork").getBytes()),
+                dataToConnect.getInt("destServicePlug"),
+                InetAddress.getLocalHost(),
+                sourceServicePlug);
         writerToService = new PrintWriter(socketToService.getOutputStream());
         readerFromService = new BufferedReader(new InputStreamReader(socketToService.getInputStream()));
+        destServicePlug = dataToConnect.getInt("destServicePlug");
     }
 
-    public int getPlug() {
-        return plug;
+    public int getSourceServicePlug() {
+        return sourceServicePlug;
     }
 
     public boolean getIsBusy() {
         return isBusy.get();
     }
 
-    public void disconnect() {
-        // TODO: add reference to ServiceApi to send closing message to Manager
+    public void disconnect(String messageID) {
+        // try closing connection and assign status
+
+        // TODO: think about status
+        int status = 200;
+        writerToService.close();
+        try {
+            readerFromService.close();
+            socketToService.close();
+        } catch (IOException e) {
+            // TODO: Auto-generated catch block
+            e.printStackTrace();
+            status = 300;
+        }
+
+        // send closing message to Manager
+        JSONObject sourceConnectionClose = new JSONObject();
+        sourceConnectionClose.put("type", "sourceConnectionClose");
+        sourceConnectionClose.put("internalMessage", true);
+        sourceConnectionClose.put("messageID", messageID);
+        sourceConnectionClose.put("sourceServicePlug", sourceServicePlug);
+        sourceConnectionClose.put("destServicePlug", destServicePlug);
+        sourceConnectionClose.put("status", status);
+
+        serviceApi.sendMessage(sourceConnectionClose);
+
         executorService.shutdown();
     }
 
@@ -81,16 +115,23 @@ public class ServiceToService implements Runnable {
         executorService.submit(() -> {
             while (!Thread.currentThread().isInterrupted()) {
                 JSONObject sendData = sendList.poll();
-                //TODO: if field in identifier is equals to typeOfService send
-                writerToService.println(sendData.toString());
-                writerToService.flush();
+
+                // if message isn't internal and dest Service is equal typOfService send data
+                if (!sendData.getBoolean("internalMessage")
+                        && sendData.getString("typeOfService").equals(typeOfService)) {
+                    isBusy.set(true);
+                    writerToService.println(sendData.toString());
+                    writerToService.flush();
+                } else {
+                    sendList.add(sendData);
+                }
+
                 try {
                     Thread.sleep(10);
                 } catch (InterruptedException e) {
                     // TODO: Auto-generated catch block
                     e.printStackTrace();
                 }
-                isBusy.set(true);
             }
         });
 

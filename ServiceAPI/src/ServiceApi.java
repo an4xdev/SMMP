@@ -8,12 +8,15 @@ import java.util.Collections;
 import java.util.HashMap;
 import java.util.LinkedList;
 import java.util.concurrent.Callable;
+import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
 import java.util.concurrent.LinkedBlockingQueue;
 
 import org.json.JSONObject;
+
+import com.fasterxml.uuid.Generators;
 
 public class ServiceApi extends Thread implements IServiceApi {
 
@@ -42,8 +45,8 @@ public class ServiceApi extends Thread implements IServiceApi {
     public void start(JSONObject params) throws UnknownHostException, IOException {
         // connect to ServerSocket in Agent via connectToAgent
         connectToAgent();
-        // initialize map of plugs
 
+        // initialize map of plugs
         JSONObject plugsJSON = params.getJSONObject("plugs");
 
         for (String serviceType : plugsJSON.keySet()) {
@@ -54,8 +57,14 @@ public class ServiceApi extends Thread implements IServiceApi {
         // start run method
         this.start();
 
-        // TODO: send message about that service was started via sendMessage
-        sendMessage(null);
+        // send message about that service was started via sendMessage
+        JSONObject startServiceResponse = new JSONObject();
+        startServiceResponse.put("type", "startServiceResponse");
+        startServiceResponse.put("internalMessage", true);
+        startServiceResponse.put("messageID", params.getString("messageID"));
+        // TODO: think about status 
+        startServiceResponse.put("status", 200);
+        sendMessage(startServiceResponse);
     }
 
     private void connectToAgent() throws UnknownHostException, IOException {
@@ -67,16 +76,39 @@ public class ServiceApi extends Thread implements IServiceApi {
 
     @Override
     public void sendMessage(JSONObject message) {
-        sendList.add(message);
+        if (message.getBoolean("internalMessage")) {
+            // add to sendList
+            sendList.add(message);
+        } else {
+            // check if is free runnable object that is connected to specific Service
+            if (connections.get(message.getString("typeOfService")).size() < 1) {
+                // TODO: change connect return type to boolean?
+                connect(message.getString("typeOfService"));
+            }
+            sendList.add(message);
+        }
     }
 
-    public Future<JSONObject> receivceResponse(JSONObject identifier) {
+    public Future<JSONObject> receivceResponse(String messageID) {
         return executorService.submit(new Callable<JSONObject>() {
             @Override
             public JSONObject call() {
-                JSONObject temp = receiveList.poll();
-                // TODO: change to checking if identifier is the same
-                // if not add to receiveList
+                JSONObject temp;
+                while (true) {
+                    temp = receiveList.poll();
+                    if (!temp.getString("messageID").equals(messageID)) {
+                        receiveList.add(temp);
+                    } else {
+                        break;
+                    }
+                    try {
+                        Thread.sleep(10);
+                    } catch (InterruptedException e) {
+                        // TODO: Auto-generated catch block
+                        e.printStackTrace();
+                    }
+                }
+
                 return temp;
             }
         });
@@ -84,36 +116,72 @@ public class ServiceApi extends Thread implements IServiceApi {
     }
 
     private void connect(String typeOfService) {
-        // TODO: send request to mamanger
-        sendMessage(null);
+        // send request
+        JSONObject connectionRequest = new JSONObject();
+        connectionRequest.put("type", "connectionRequest");
+        connectionRequest.put("internalMessage", true);
+        String messageID = UUIDGenerator();
+        connectionRequest.put("messageID", messageID);
+        connectionRequest.put("sourcePlug", plugs.get(typeOfService));
+        connectionRequest.put("destServiceName", typeOfService);
+        sendMessage(connectionRequest);
         // receive message
-        Future<JSONObject> response = receivceResponse(null);
-        // connect
-        LinkedBlockingQueue<ServiceToService> connectionsQueue = connections.get(typeOfService);
+        JSONObject response = null;
+        try {
+            response = receivceResponse(messageID).get();
+        } catch (InterruptedException e) {
+            // TODO: Auto-generated catch block
+            e.printStackTrace();
+        } catch (ExecutionException e) {
+            // TODO: Auto-generated catch block
+            e.printStackTrace();
+        }
+        if (response != null) {
+            // connect
+            LinkedBlockingQueue<ServiceToService> connectionsQueue = connections.get(typeOfService);
+            // send confirmation
+            JSONObject connectionConfirmation = new JSONObject();
+            connectionConfirmation.put("type", "connectionConfirmation");
+            connectionConfirmation.put("internalMessage", true);
+            connectionConfirmation.put("messageID", UUIDGenerator());
+            // TODO: create ServiceToService and think about status
+            connectionConfirmation.put("statusCode", connectionsQueue.offer(null) ? 200 : 300);
+            connectionConfirmation.put("sourcePlug", plugs.get(typeOfService));
+            connectionConfirmation.put("destPlug", response.getInt("destPlug"));
+            sendMessage(connectionConfirmation);
+        }
 
-        connectionsQueue.offer(null);
-        // TODO: send confirmation
-        sendMessage(null);
     }
 
-    private void disconnect(int plug) {
+    private void disconnect(String messageID, int plug) {
         connections.values().stream()
                 .flatMap(LinkedBlockingQueue<ServiceToService>::stream)
-                .filter(r -> r.getPlug() == plug).findFirst().ifPresent(r -> r.disconnect());
+                .filter(r -> r.getSourceServicePlug() == plug).findFirst().ifPresent(r -> r.disconnect(messageID));
 
-        connections.values().forEach(l -> l.removeIf(r -> r.getPlug() == plug));
+        connections.values().forEach(l -> l.removeIf(r -> r.getSourceServicePlug() == plug));
     }
 
-    private void close() throws InterruptedException {
+    private void close(String messageID) {
 
         // close all runnable connections and send messages
-        connections.values().forEach(l -> l.forEach(r -> r.disconnect()));
+        connections.values().forEach(l -> l.forEach(r -> r.disconnect(messageID)));
 
-        // TODO: send message about closing
-        sendMessage(null);
+        // send response
+        JSONObject softShutdownResponse = new JSONObject();
+        softShutdownResponse.put("type", "softShutdownResponse");
+        softShutdownResponse.put("internalMessage", true);
+        // TODO: change serviceID
+        softShutdownResponse.put("serviceID", 10);
+        softShutdownResponse.put("status", 200);
+        sendMessage(softShutdownResponse);
 
         // wait 5 seconds
-        Thread.sleep(5000);
+        try {
+            Thread.sleep(5000);
+        } catch (InterruptedException e) {
+            // TODO: Auto-generated catch block
+            e.printStackTrace();
+        }
 
         // close application
         System.exit(0);
@@ -125,8 +193,22 @@ public class ServiceApi extends Thread implements IServiceApi {
             while (!Thread.currentThread().isInterrupted()) {
                 try {
                     String response = readerFromAgent.readLine();
-                    // TODO: check if request is from Manager and process
-                    receiveList.add(new JSONObject(response));
+                    JSONObject responseObject = new JSONObject(response);
+                    if (responseObject.getBoolean("internalMessage")) {
+                        // process
+                        switch (responseObject.getString("type")) {
+                            case "connectionCloseRequest":
+                                disconnect(responseObject.getString("messageID"), responseObject.getInt("sourcePlug"));
+                                break;
+                            case "softShutdownRequest":
+                                close(responseObject.getString("messageID"));
+                                break;
+                            default:
+                                break;
+                        }
+                    } else {
+                        receiveList.add(responseObject);
+                    }
                     Thread.sleep(10);
                 } catch (IOException e) {
                     // TODO: Auto-generated catch block
@@ -140,10 +222,13 @@ public class ServiceApi extends Thread implements IServiceApi {
         executorService.submit(() -> {
             while (!Thread.currentThread().isInterrupted()) {
                 if (sendList.size() != 0) {
-                    JSONObject temp = sendList.poll();
-                    // TODO:: add checking if message is to Manager
-                    writerToAgent.println(temp.toString());
-                    writerToAgent.flush();
+                    JSONObject requestObject = sendList.poll();
+                    if (requestObject.getBoolean("internalMessage")) {
+                        writerToAgent.println(requestObject.toString());
+                        writerToAgent.flush();
+                    } else {
+                        sendList.add(requestObject);
+                    }
                 }
                 try {
                     Thread.sleep(10);
@@ -153,6 +238,11 @@ public class ServiceApi extends Thread implements IServiceApi {
                 }
             }
         });
+    }
+
+    @Override
+    public String UUIDGenerator() {
+        return Generators.timeBasedGenerator().generate().toString();
     }
 
 }

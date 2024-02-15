@@ -10,6 +10,8 @@ public interface IServiceApi {
 
     public void sendMessage(JSONObject message);
 
-    public Future<JSONObject> receivceResponse(JSONObject identifier);
+    public Future<JSONObject> receivceResponse(String messageID);
+
+    public String UUIDGenerator();
 
 }
