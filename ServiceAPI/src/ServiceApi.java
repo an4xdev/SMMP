@@ -32,6 +32,8 @@ public class ServiceApi extends Thread implements IServiceApi {
     private BufferedReader readerFromAgent;
     private PrintWriter writerToAgent;
 
+    private int serviceID;
+
     public ServiceApi() {
         executorService = Executors.newVirtualThreadPerTaskExecutor();
         sendList = (LinkedList<JSONObject>) Collections
@@ -44,7 +46,9 @@ public class ServiceApi extends Thread implements IServiceApi {
     @Override
     public void start(JSONObject params) throws UnknownHostException, IOException {
         // connect to ServerSocket in Agent via connectToAgent
-        connectToAgent();
+        connectToAgent(params);
+
+        serviceID = params.getInt("serviceID");
 
         // initialize map of plugs
         JSONObject plugsJSON = params.getJSONObject("plugs");
@@ -62,14 +66,14 @@ public class ServiceApi extends Thread implements IServiceApi {
         startServiceResponse.put("type", "startServiceResponse");
         startServiceResponse.put("internalMessage", true);
         startServiceResponse.put("messageID", params.getString("messageID"));
-        // TODO: think about status 
-        startServiceResponse.put("status", 200);
+        startServiceResponse.put("serviceID", serviceID);
+        startServiceResponse.put("success", true);
         sendMessage(startServiceResponse);
     }
 
-    private void connectToAgent() throws UnknownHostException, IOException {
+    private void connectToAgent(JSONObject params) throws UnknownHostException, IOException {
         // connect to ServerSocket in Agent
-        socketToAgent = new Socket("address", 1234);
+        socketToAgent = new Socket(params.getString("agentNetwork"), params.getInt("agentPort"));
         readerFromAgent = new BufferedReader(new InputStreamReader(socketToAgent.getInputStream()));
         writerToAgent = new PrintWriter(socketToAgent.getOutputStream());
     }
@@ -81,8 +85,8 @@ public class ServiceApi extends Thread implements IServiceApi {
             sendList.add(message);
         } else {
             // check if is free runnable object that is connected to specific Service
-            if (connections.get(message.getString("typeOfService")).size() < 1) {
-                // TODO: change connect return type to boolean?
+            if (connections.get(message.getString("typeOfService")).size() < 1 || !connections.get(
+                    message.getString("typeOfService")).stream().anyMatch(s -> !s.getIsBusy())) {
                 connect(message.getString("typeOfService"));
             }
             sendList.add(message);
@@ -122,6 +126,7 @@ public class ServiceApi extends Thread implements IServiceApi {
         connectionRequest.put("internalMessage", true);
         String messageID = UUIDGenerator();
         connectionRequest.put("messageID", messageID);
+        connectionRequest.put("serviceID", serviceID);
         connectionRequest.put("sourcePlug", plugs.get(typeOfService));
         connectionRequest.put("destServiceName", typeOfService);
         sendMessage(connectionRequest);
@@ -144,8 +149,19 @@ public class ServiceApi extends Thread implements IServiceApi {
             connectionConfirmation.put("type", "connectionConfirmation");
             connectionConfirmation.put("internalMessage", true);
             connectionConfirmation.put("messageID", UUIDGenerator());
-            // TODO: create ServiceToService and think about status
-            connectionConfirmation.put("statusCode", connectionsQueue.offer(null) ? 200 : 300);
+            // create ServiceToService
+            boolean success = true;
+            ServiceToService temp;
+            try {
+                temp = new ServiceToService(plugs.get(typeOfService), typeOfService,
+                        sendList, receiveList, response, this);
+                connectionsQueue.offer(temp);
+            } catch (IOException e) {
+                // TODO: Auto-generated catch block
+                e.printStackTrace();
+                success = false;
+            }
+            connectionConfirmation.put("success", success);
             connectionConfirmation.put("sourcePlug", plugs.get(typeOfService));
             connectionConfirmation.put("destPlug", response.getInt("destPlug"));
             sendMessage(connectionConfirmation);
@@ -156,7 +172,8 @@ public class ServiceApi extends Thread implements IServiceApi {
     private void disconnect(String messageID, int plug) {
         connections.values().stream()
                 .flatMap(LinkedBlockingQueue<ServiceToService>::stream)
-                .filter(r -> r.getSourceServicePlug() == plug).findFirst().ifPresent(r -> r.disconnect(messageID));
+                .filter(r -> r.getSourceServicePlug() == plug).findFirst()
+                .ifPresent(r -> r.disconnect(messageID));
 
         connections.values().forEach(l -> l.removeIf(r -> r.getSourceServicePlug() == plug));
     }
@@ -170,9 +187,9 @@ public class ServiceApi extends Thread implements IServiceApi {
         JSONObject softShutdownResponse = new JSONObject();
         softShutdownResponse.put("type", "softShutdownResponse");
         softShutdownResponse.put("internalMessage", true);
-        // TODO: change serviceID
-        softShutdownResponse.put("serviceID", 10);
-        softShutdownResponse.put("status", 200);
+        softShutdownResponse.put("messageID", messageID);
+        softShutdownResponse.put("serviceID", serviceID);
+        softShutdownResponse.put("success", true);
         sendMessage(softShutdownResponse);
 
         // wait 5 seconds
@@ -204,6 +221,7 @@ public class ServiceApi extends Thread implements IServiceApi {
                                 close(responseObject.getString("messageID"));
                                 break;
                             default:
+                                System.out.println("Unknown internalMessage: " + responseObject.toString());
                                 break;
                         }
                     } else {
@@ -238,6 +256,10 @@ public class ServiceApi extends Thread implements IServiceApi {
                 }
             }
         });
+    }
+
+    public int getServiceID() {
+        return serviceID;
     }
 
     @Override

@@ -63,10 +63,8 @@ public class ServiceToService implements Runnable {
     }
 
     public void disconnect(String messageID) {
-        // try closing connection and assign status
-
-        // TODO: think about status
-        int status = 200;
+        // try closing connection
+        boolean success = true;
         writerToService.close();
         try {
             readerFromService.close();
@@ -74,7 +72,7 @@ public class ServiceToService implements Runnable {
         } catch (IOException e) {
             // TODO: Auto-generated catch block
             e.printStackTrace();
-            status = 300;
+            success = false;
         }
 
         // send closing message to Manager
@@ -82,9 +80,10 @@ public class ServiceToService implements Runnable {
         sourceConnectionClose.put("type", "sourceConnectionClose");
         sourceConnectionClose.put("internalMessage", true);
         sourceConnectionClose.put("messageID", messageID);
+        sourceConnectionClose.put("serviceID", serviceApi.getServiceID());
         sourceConnectionClose.put("sourceServicePlug", sourceServicePlug);
         sourceConnectionClose.put("destServicePlug", destServicePlug);
-        sourceConnectionClose.put("status", status);
+        sourceConnectionClose.put("success", success);
 
         serviceApi.sendMessage(sourceConnectionClose);
 
@@ -97,41 +96,29 @@ public class ServiceToService implements Runnable {
         executorService.submit(() -> {
             try {
                 while (!Thread.currentThread().isInterrupted()) {
-                    String response = readerFromService.readLine();
-                    receiveList.add(new JSONObject(response));
+                    JSONObject sendData = sendList.poll();
+                    // if message isn't internal and dest Service is equal typOfService send data
+                    if (!sendData.getBoolean("internalMessage")
+                            && sendData.getString("typeOfService").equals(typeOfService)) {
+                        isBusy.set(true);
+                        writerToService.println(sendData.toString());
+                        writerToService.flush();
+                        String response = readerFromService.readLine();
+                        receiveList.add(new JSONObject(response));
+                        isBusy.set(false);
+                    } else {
+                        sendList.add(sendData);
+                    }
                     try {
                         Thread.sleep(10);
                     } catch (InterruptedException e) {
                         // TODO: Auto-generated catch block
                         e.printStackTrace();
                     }
-                    isBusy.set(false);
                 }
             } catch (IOException e) {
                 // TODO: Auto-generated catch block
                 e.printStackTrace();
-            }
-        });
-        executorService.submit(() -> {
-            while (!Thread.currentThread().isInterrupted()) {
-                JSONObject sendData = sendList.poll();
-
-                // if message isn't internal and dest Service is equal typOfService send data
-                if (!sendData.getBoolean("internalMessage")
-                        && sendData.getString("typeOfService").equals(typeOfService)) {
-                    isBusy.set(true);
-                    writerToService.println(sendData.toString());
-                    writerToService.flush();
-                } else {
-                    sendList.add(sendData);
-                }
-
-                try {
-                    Thread.sleep(10);
-                } catch (InterruptedException e) {
-                    // TODO: Auto-generated catch block
-                    e.printStackTrace();
-                }
             }
         });
 
