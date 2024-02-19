@@ -11,14 +11,13 @@ import java.util.concurrent.atomic.AtomicBoolean;
 
 import org.json.JSONObject;
 
-public class ServiceToService implements Runnable {
+public class ServiceToServiceOut implements Runnable {
 
     private int sourceServicePlug;
     private int destServicePlug;
     private String typeOfService;
 
-    private LinkedList<JSONObject> sendList;
-    private LinkedList<JSONObject> receiveList;
+    private LinkedList<JSONObject> messagesList;
 
     private final ExecutorService executorService;
 
@@ -30,13 +29,12 @@ public class ServiceToService implements Runnable {
 
     private ServiceApi serviceApi;
 
-    public ServiceToService(int sourceServicePlug, String typeOfService, LinkedList<JSONObject> sendList,
-            LinkedList<JSONObject> receiveList, JSONObject dataToConnect, ServiceApi serviceApi) throws IOException {
+    public ServiceToServiceOut(int sourceServicePlug, String typeOfService, LinkedList<JSONObject> messagesList,
+            JSONObject dataToConnect, ServiceApi serviceApi) throws IOException {
         executorService = Executors.newVirtualThreadPerTaskExecutor();
         this.sourceServicePlug = sourceServicePlug;
         this.typeOfService = typeOfService;
-        this.sendList = sendList;
-        this.receiveList = receiveList;
+        this.messagesList = messagesList;
         this.serviceApi = serviceApi;
         initializeSocket(dataToConnect);
         this.run();
@@ -96,18 +94,19 @@ public class ServiceToService implements Runnable {
         executorService.submit(() -> {
             try {
                 while (!Thread.currentThread().isInterrupted()) {
-                    JSONObject sendData = sendList.poll();
+                    JSONObject sendData = messagesList.poll();
                     // if message isn't internal and dest Service is equal typOfService send data
                     if (!sendData.getBoolean("internalMessage")
-                            && sendData.getString("typeOfService").equals(typeOfService)) {
+                            && sendData.getString("typeOfService").equals(typeOfService)
+                            && sendData.getString("type").contains("Request")) {
                         isBusy.set(true);
                         writerToService.println(sendData.toString());
                         writerToService.flush();
                         String response = readerFromService.readLine();
-                        receiveList.add(new JSONObject(response));
+                        messagesList.add(new JSONObject(response));
                         isBusy.set(false);
                     } else {
-                        sendList.add(sendData);
+                        messagesList.add(sendData);
                     }
                     try {
                         Thread.sleep(10);

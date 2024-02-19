@@ -22,11 +22,10 @@ public class ServiceApi extends Thread implements IServiceApi {
 
     private final ExecutorService executorService;
 
-    private LinkedList<JSONObject> sendList;
-    private LinkedList<JSONObject> receiveList;
+    private LinkedList<JSONObject> messagesList;
 
-    private HashMap<String, LinkedBlockingQueue<ServiceToService>> connections;
-    private HashMap<String, Integer> plugs;
+    private HashMap<String, LinkedBlockingQueue<ServiceToServiceOut>> connections;
+    private HashMap<String, Integer> plugsOut;
 
     private Socket socketToAgent;
     private BufferedReader readerFromAgent;
@@ -36,26 +35,44 @@ public class ServiceApi extends Thread implements IServiceApi {
 
     public ServiceApi() {
         executorService = Executors.newVirtualThreadPerTaskExecutor();
-        sendList = (LinkedList<JSONObject>) Collections
+        messagesList = (LinkedList<JSONObject>) Collections
                 .synchronizedList(new LinkedList<JSONObject>());
-        receiveList = (LinkedList<JSONObject>) Collections.synchronizedList(new LinkedList<JSONObject>());
         connections = new HashMap<>();
-        plugs = new HashMap<>();
+        plugsOut = new HashMap<>();
     }
 
     @Override
-    public void start(JSONObject params) throws UnknownHostException, IOException {
+    public void start(JSONObject params) {
+        // TODO: add catching exceptions and maybe shutdown application?, maybe in params add emergency data to Manager so Service can directly report to Manager?
         // connect to ServerSocket in Agent via connectToAgent
-        connectToAgent(params);
+
+        try {
+            connectToAgent(params);
+        } catch (IOException e) {
+            // TODO: Auto-generated catch block
+            e.printStackTrace();
+            System.exit(-1);
+        }
 
         serviceID = params.getInt("serviceID");
 
-        // initialize map of plugs
-        JSONObject plugsJSON = params.getJSONObject("plugs");
+        // initialize map of Out plugs
+        JSONObject plugsOutJSON = params.getJSONObject("plugs").getJSONObject("out");
 
-        for (String serviceType : plugsJSON.keySet()) {
-            plugs.put(serviceType, plugsJSON.getInt(serviceType));
+        for (String serviceType : plugsOutJSON.keySet()) {
+            plugsOut.put(serviceType, plugsOutJSON.getInt(serviceType));
             connections.put(serviceType, new LinkedBlockingQueue<>());
+        }
+
+        // if needed initialize In plugs 
+        if (params.getJSONObject("plugs").has("in")) {
+            JSONObject plugsInJSON = params.getJSONObject("plugs").getJSONObject("in");
+
+            for (String serviceType : plugsInJSON.keySet()) {
+                executorService.submit(
+                        new ServiceToServiceIn(plugsInJSON.getInt(serviceType), messagesList));
+            }
+
         }
 
         // start run method
@@ -71,6 +88,13 @@ public class ServiceApi extends Thread implements IServiceApi {
         sendMessage(startServiceResponse);
     }
 
+    /**
+     * Method that connects to Agent
+     * @param params
+     * @throws UnknownHostException
+     * @throws IOException
+     * 
+     */
     private void connectToAgent(JSONObject params) throws UnknownHostException, IOException {
         // connect to ServerSocket in Agent
         socketToAgent = new Socket(params.getString("agentNetwork"), params.getInt("agentPort"));
@@ -82,26 +106,28 @@ public class ServiceApi extends Thread implements IServiceApi {
     public void sendMessage(JSONObject message) {
         if (message.getBoolean("internalMessage")) {
             // add to sendList
-            sendList.add(message);
+            messagesList.add(message);
         } else {
             // check if is free runnable object that is connected to specific Service
             if (connections.get(message.getString("typeOfService")).size() < 1 || !connections.get(
                     message.getString("typeOfService")).stream().anyMatch(s -> !s.getIsBusy())) {
                 connect(message.getString("typeOfService"));
             }
-            sendList.add(message);
+            messagesList.add(message);
         }
     }
 
+    @Override
     public Future<JSONObject> receivceResponse(String messageID) {
+        // retrieve from responsesList data where messageID is equal and return 
         return executorService.submit(new Callable<JSONObject>() {
             @Override
             public JSONObject call() {
                 JSONObject temp;
                 while (true) {
-                    temp = receiveList.poll();
+                    temp = messagesList.poll();
                     if (!temp.getString("messageID").equals(messageID)) {
-                        receiveList.add(temp);
+                        messagesList.add(temp);
                     } else {
                         break;
                     }
@@ -119,7 +145,40 @@ public class ServiceApi extends Thread implements IServiceApi {
 
     }
 
+    @Override
+    public Future<JSONObject> receiveDataToProcess() {
+        // retrieve from responsesList data where message isn't internal and type contains request and return 
+        return executorService.submit(new Callable<JSONObject>() {
+            @Override
+            public JSONObject call() {
+                JSONObject temp;
+                while (true) {
+                    temp = messagesList.poll();
+                    if (!temp.getBoolean("internalMessage")
+                            && temp.getString("type").contains("Request")) {
+                        break;
+                    } else {
+                        messagesList.add(temp);
+                    }
+                    try {
+                        Thread.sleep(10);
+                    } catch (InterruptedException e) {
+                        // TODO: Auto-generated catch block
+                        e.printStackTrace();
+                    }
+                }
+
+                return temp;
+            }
+        });
+    }
+
+    /**
+     * Connecting to specific type of Service
+     * @param typeOfService
+     */
     private void connect(String typeOfService) {
+        // TODO: Service has one out plug per Service type, in Manager and Service implement adding more Out plugs?
         // send request
         JSONObject connectionRequest = new JSONObject();
         connectionRequest.put("type", "connectionRequest");
@@ -127,7 +186,7 @@ public class ServiceApi extends Thread implements IServiceApi {
         String messageID = UUIDGenerator();
         connectionRequest.put("messageID", messageID);
         connectionRequest.put("serviceID", serviceID);
-        connectionRequest.put("sourcePlug", plugs.get(typeOfService));
+        connectionRequest.put("sourcePlug", plugsOut.get(typeOfService));
         connectionRequest.put("destServiceName", typeOfService);
         sendMessage(connectionRequest);
         // receive message
@@ -143,7 +202,7 @@ public class ServiceApi extends Thread implements IServiceApi {
         }
         if (response != null) {
             // connect
-            LinkedBlockingQueue<ServiceToService> connectionsQueue = connections.get(typeOfService);
+            LinkedBlockingQueue<ServiceToServiceOut> connectionsQueue = connections.get(typeOfService);
             // send confirmation
             JSONObject connectionConfirmation = new JSONObject();
             connectionConfirmation.put("type", "connectionConfirmation");
@@ -151,10 +210,10 @@ public class ServiceApi extends Thread implements IServiceApi {
             connectionConfirmation.put("messageID", UUIDGenerator());
             // create ServiceToService
             boolean success = true;
-            ServiceToService temp;
+            ServiceToServiceOut temp;
             try {
-                temp = new ServiceToService(plugs.get(typeOfService), typeOfService,
-                        sendList, receiveList, response, this);
+                temp = new ServiceToServiceOut(plugsOut.get(typeOfService), typeOfService,
+                        messagesList, response, this);
                 connectionsQueue.offer(temp);
             } catch (IOException e) {
                 // TODO: Auto-generated catch block
@@ -162,22 +221,32 @@ public class ServiceApi extends Thread implements IServiceApi {
                 success = false;
             }
             connectionConfirmation.put("success", success);
-            connectionConfirmation.put("sourcePlug", plugs.get(typeOfService));
+            connectionConfirmation.put("sourcePlug", plugsOut.get(typeOfService));
             connectionConfirmation.put("destPlug", response.getInt("destPlug"));
             sendMessage(connectionConfirmation);
         }
 
     }
 
+    /**
+     * Disconnecting plug with specific number
+     * @param messageID - to send response
+     * @param plug - plug number
+     */
     private void disconnect(String messageID, int plug) {
         connections.values().stream()
-                .flatMap(LinkedBlockingQueue<ServiceToService>::stream)
+                .flatMap(LinkedBlockingQueue<ServiceToServiceOut>::stream)
                 .filter(r -> r.getSourceServicePlug() == plug).findFirst()
                 .ifPresent(r -> r.disconnect(messageID));
 
         connections.values().forEach(l -> l.removeIf(r -> r.getSourceServicePlug() == plug));
     }
 
+    /**
+     * Closing application when got specific request.
+     * Closing connections, runnable when data are received from another Services.
+     * @param messageID - to send response
+     */
     private void close(String messageID) {
 
         // close all runnable connections and send messages
@@ -200,6 +269,8 @@ public class ServiceApi extends Thread implements IServiceApi {
             e.printStackTrace();
         }
 
+        executorService.shutdown();
+
         // close application
         System.exit(0);
     }
@@ -211,7 +282,8 @@ public class ServiceApi extends Thread implements IServiceApi {
                 try {
                     String response = readerFromAgent.readLine();
                     JSONObject responseObject = new JSONObject(response);
-                    if (responseObject.getBoolean("internalMessage")) {
+                    if (responseObject.getBoolean("internalMessage")
+                            && responseObject.getString("type").contains("Request")) {
                         // process
                         switch (responseObject.getString("type")) {
                             case "connectionCloseRequest":
@@ -225,7 +297,7 @@ public class ServiceApi extends Thread implements IServiceApi {
                                 break;
                         }
                     } else {
-                        receiveList.add(responseObject);
+                        messagesList.add(responseObject);
                     }
                     Thread.sleep(10);
                 } catch (IOException e) {
@@ -239,13 +311,14 @@ public class ServiceApi extends Thread implements IServiceApi {
         });
         executorService.submit(() -> {
             while (!Thread.currentThread().isInterrupted()) {
-                if (sendList.size() != 0) {
-                    JSONObject requestObject = sendList.poll();
-                    if (requestObject.getBoolean("internalMessage")) {
+                if (messagesList.size() != 0) {
+                    JSONObject requestObject = messagesList.poll();
+                    if (requestObject.getBoolean("internalMessage")
+                            && requestObject.getString("type").contains("Response")) {
                         writerToAgent.println(requestObject.toString());
                         writerToAgent.flush();
                     } else {
-                        sendList.add(requestObject);
+                        messagesList.add(requestObject);
                     }
                 }
                 try {
