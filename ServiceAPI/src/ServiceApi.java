@@ -14,6 +14,7 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
 import java.util.concurrent.LinkedBlockingQueue;
 
+import org.json.JSONException;
 import org.json.JSONObject;
 
 import com.fasterxml.uuid.Generators;
@@ -46,15 +47,51 @@ public class ServiceApi extends Thread implements IServiceApi {
         // TODO: add catching exceptions and maybe shutdown application?, maybe in params add emergency data to Manager so Service can directly report to Manager?
         // connect to ServerSocket in Agent via connectToAgent
 
+        serviceID = params.getInt("serviceID");
         try {
             connectToAgent(params);
         } catch (IOException e) {
-            // TODO: Auto-generated catch block
+            System.out.println(
+                    String.format("ServiceApi with ID: %d, in start() failed to connect to Agent. Sending data to Manager",
+                            serviceID));
+            JSONObject dataToConnectToManager = params.getJSONObject("emergencyData");
+            try (Socket socketToManager = new Socket(dataToConnectToManager.getString("managerNetwork"),
+                    dataToConnectToManager.getInt("managerPort"))) {
+                PrintWriter writerToManager = new PrintWriter(socketToManager.getOutputStream());
+                JSONObject errorMessage = new JSONObject();
+                errorMessage.put("type", "startServiceResponse");
+                errorMessage.put("internalMessage", true);
+                errorMessage.put("messageID", params.getString("messageID"));
+                errorMessage.put("serviceID", serviceID);
+                errorMessage.put("success", false);
+                writerToManager.println(errorMessage.toString());
+                writerToManager.close();
+            } catch (JSONException e1) {
+                System.out.println(
+                        String.format(
+                                "ServiceApi with ID: %d, in start() was exception with JSON",
+                                serviceID));
+                e1.printStackTrace();
+            } catch (UnknownHostException e1) {
+                System.out.println(
+                        String.format(
+                                "ServiceApi with ID: %d, in start() Socket to Manager throw unknown host exception",
+                                serviceID));
+                e1.printStackTrace();
+            } catch (IOException e1) {
+                System.out.println(
+                        String.format(
+                                "ServiceApi with ID: %d, in start() Socket to Manager throw IO exception",
+                                serviceID));
+                e1.printStackTrace();
+            }
+            System.out.println(
+                    String.format(
+                            "ServiceApi with ID: %d, in start() connection to Agent failed",
+                            serviceID));
             e.printStackTrace();
             System.exit(-1);
         }
-
-        serviceID = params.getInt("serviceID");
 
         // initialize map of Out plugs
         JSONObject plugsOutJSON = params.getJSONObject("plugs").getJSONObject("out");
@@ -89,7 +126,8 @@ public class ServiceApi extends Thread implements IServiceApi {
     }
 
     /**
-     * Method that connects to Agent
+     * Method that connects to Agent.
+     * 
      * @param params
      * @throws UnknownHostException
      * @throws IOException
@@ -134,7 +172,8 @@ public class ServiceApi extends Thread implements IServiceApi {
                     try {
                         Thread.sleep(10);
                     } catch (InterruptedException e) {
-                        // TODO: Auto-generated catch block
+                        System.out.println(String.format(
+                                "ServiceApi with ID: %d, in receiveResponse() Thread.sleep() was interrupted", serviceID));
                         e.printStackTrace();
                     }
                 }
@@ -163,7 +202,9 @@ public class ServiceApi extends Thread implements IServiceApi {
                     try {
                         Thread.sleep(10);
                     } catch (InterruptedException e) {
-                        // TODO: Auto-generated catch block
+                        System.out.println(String.format(
+                                "ServiceApi with ID: %d, in receiveDataToProcess() Thread.sleep() was interrupted",
+                                serviceID));
                         e.printStackTrace();
                     }
                 }
@@ -174,7 +215,8 @@ public class ServiceApi extends Thread implements IServiceApi {
     }
 
     /**
-     * Connecting to specific type of Service
+     * Connecting to specific type of Service.
+     * 
      * @param typeOfService
      */
     private void connect(String typeOfService) {
@@ -194,10 +236,12 @@ public class ServiceApi extends Thread implements IServiceApi {
         try {
             response = receivceResponse(messageID).get();
         } catch (InterruptedException e) {
-            // TODO: Auto-generated catch block
+            System.out.println(String.format(
+                    "ServiceApi with ID: %d, in connect() current thread was interrupted while waiting.", serviceID));
             e.printStackTrace();
         } catch (ExecutionException e) {
-            // TODO: Auto-generated catch block
+            System.out.println(String.format(
+                    "ServiceApi with ID: %d, in connect() computation threw an exception.", serviceID));
             e.printStackTrace();
         }
         if (response != null) {
@@ -216,7 +260,9 @@ public class ServiceApi extends Thread implements IServiceApi {
                         messagesList, response, this);
                 connectionsQueue.offer(temp);
             } catch (IOException e) {
-                // TODO: Auto-generated catch block
+                System.out.println(String.format(
+                        "ServiceApi with ID: %d, in connect() initialization of connetion to another Service failed. Source Service plug: %d, dest Service name: %s",
+                        serviceID, plugsOut.get(typeOfService), typeOfService));
                 e.printStackTrace();
                 success = false;
             }
@@ -229,7 +275,8 @@ public class ServiceApi extends Thread implements IServiceApi {
     }
 
     /**
-     * Disconnecting plug with specific number
+     * Disconnecting plug with specific number.
+     * 
      * @param messageID - to send response
      * @param plug - plug number
      */
@@ -244,7 +291,9 @@ public class ServiceApi extends Thread implements IServiceApi {
 
     /**
      * Closing application when got specific request.
+     * <p>
      * Closing connections, runnable when data are received from another Services.
+     * 
      * @param messageID - to send response
      */
     private void close(String messageID) {
@@ -265,7 +314,9 @@ public class ServiceApi extends Thread implements IServiceApi {
         try {
             Thread.sleep(5000);
         } catch (InterruptedException e) {
-            // TODO: Auto-generated catch block
+            System.out.println(String.format(
+                    "ServiceApi with ID: %d, in close() Thread.sleep() was interrupted.",
+                    serviceID));
             e.printStackTrace();
         }
 
@@ -301,10 +352,14 @@ public class ServiceApi extends Thread implements IServiceApi {
                     }
                     Thread.sleep(10);
                 } catch (IOException e) {
-                    // TODO: Auto-generated catch block
+                    System.out.println(String.format(
+                            "ServiceApi with ID: %d, in run() BufferedReader from Agent throw IO exception.",
+                            serviceID));
                     e.printStackTrace();
                 } catch (InterruptedException e) {
-                    // TODO: Auto-generated catch block
+                    System.out.println(String.format(
+                            "ServiceApi with ID: %d, in run() Thread.sleep() was interrupted.",
+                            serviceID));
                     e.printStackTrace();
                 }
             }
@@ -324,20 +379,27 @@ public class ServiceApi extends Thread implements IServiceApi {
                 try {
                     Thread.sleep(10);
                 } catch (InterruptedException e) {
-                    // TODO: Auto-generated catch block
+                    System.out.println(String.format(
+                            "ServiceApi with ID: %d, in run() Thread.sleep() was interrupted.",
+                            serviceID));
                     e.printStackTrace();
                 }
             }
         });
     }
 
+    /**
+     * Get serviceID which is a unique identifier assigned by the Manager
+     * 
+     * @return serviceID as {@code int}
+     */
     public int getServiceID() {
         return serviceID;
     }
 
     @Override
     public String UUIDGenerator() {
-        return Generators.timeBasedGenerator().generate().toString();
+        return Generators.timeBasedEpochGenerator().generate().toString();
     }
 
 }

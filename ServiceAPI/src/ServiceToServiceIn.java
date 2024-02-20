@@ -50,7 +50,9 @@ public class ServiceToServiceIn implements Runnable {
         try {
             serverSocket = new ServerSocket(plugIn);
         } catch (IOException e) {
-            // TODO: Auto-generated catch block
+            System.out.println(
+                    String.format("ServiceToServiceIn with plug in: %d, in run() ServerSocket throw IO exception",
+                            plugIn));
             e.printStackTrace();
         }
 
@@ -73,26 +75,41 @@ public class ServiceToServiceIn implements Runnable {
                                     writerToService.println(responseJSON.toString());
                                     writerToService.flush();
                                 } catch (InterruptedException e) {
-                                    // TODO: Auto-generated catch block
+                                    System.out.println(
+                                            String.format(
+                                                    "ServiceToServiceIn with plug in: %d, in run() current thread was interrupted while waiting.",
+                                                    plugIn));
                                     e.printStackTrace();
                                 } catch (ExecutionException e) {
-                                    // TODO: Auto-generated catch block
+                                    System.out.println(
+                                            String.format(
+                                                    "ServiceToServiceIn with plug in: %d, in run() computation threw an exception.",
+                                                    plugIn));
                                     e.printStackTrace();
                                 }
                             } else {
                                 disconnected();
                             }
                         } catch (JSONException e) {
-                            // TODO: Auto-generated catch block
+                            System.out.println(
+                                    String.format(
+                                            "ServiceToServiceIn with plug in: %d, in run() was exception with JSON.",
+                                            plugIn));
                             e.printStackTrace();
                         } catch (IOException e) {
-                            // TODO: Auto-generated catch block
+                            System.out.println(
+                                    String.format(
+                                            "ServiceToServiceIn with plug in: %d, in run() BufferedReader from Service throw IO exception.",
+                                            plugIn));
                             e.printStackTrace();
                         }
                     }
                 });
             } catch (IOException e) {
-                // TODO: Auto-generated catch block
+                System.out.println(
+                        String.format(
+                                "ServiceToServiceIn with plug in: %d, in run() accept() method throw IO exception.",
+                                plugIn));
                 e.printStackTrace();
             }
         }

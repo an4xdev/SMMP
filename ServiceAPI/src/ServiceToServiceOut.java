@@ -66,9 +66,20 @@ public class ServiceToServiceOut implements Runnable {
         writerToService.close();
         try {
             readerFromService.close();
+
+        } catch (IOException e) {
+            System.out.println(String.format(
+                    "ServiceToServiceOut with plug out: %d, to Service: %s in disconnect() BufferedReader from Service throw IO exception via close() method.",
+                    sourceServicePlug, typeOfService));
+            e.printStackTrace();
+            success = false;
+        }
+        try {
             socketToService.close();
         } catch (IOException e) {
-            // TODO: Auto-generated catch block
+            System.out.println(String.format(
+                    "ServiceToServiceOut with plug out: %d, to Service: %s in disconnect() Socket to Service throw IO exception via close() method.",
+                    sourceServicePlug, typeOfService));
             e.printStackTrace();
             success = false;
         }
@@ -111,12 +122,16 @@ public class ServiceToServiceOut implements Runnable {
                     try {
                         Thread.sleep(10);
                     } catch (InterruptedException e) {
-                        // TODO: Auto-generated catch block
+                        System.out.println(String.format(
+                                "ServiceToServiceOut with plug out: %d, to Service: %s in run() Thread.sleep() was interrupted.",
+                                sourceServicePlug, typeOfService));
                         e.printStackTrace();
                     }
                 }
             } catch (IOException e) {
-                // TODO: Auto-generated catch block
+                System.out.println(String.format(
+                        "ServiceToServiceOut with plug out: %d, to Service: %s in run() BufferedReader from Service throw IO exception.",
+                        sourceServicePlug, typeOfService));
                 e.printStackTrace();
             }
         });
