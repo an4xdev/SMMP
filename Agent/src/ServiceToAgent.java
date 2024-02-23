@@ -12,7 +12,8 @@ import org.json.JSONObject;
 
 public class ServiceToAgent implements Runnable {
 
-    private String typeOfService;
+    // private String typeOfService;
+
     private int serviceID;
 
     private LinkedList<JSONObject> receiveList;
@@ -41,22 +42,27 @@ public class ServiceToAgent implements Runnable {
         writerToService = new PrintWriter(socketFromService.getOutputStream());
     }
 
+    public int getServiceID() {
+        return serviceID;
+    }
+
     @Override
     public void run() {
-
         executorService.submit(() -> {
             while (!Thread.currentThread().isInterrupted()) {
                 try {
                     // TODO: check if this is startServiceResponse and set fields
                     receiveList.add(new JSONObject(readerFromService.readLine()));
                 } catch (JSONException | IOException e) {
-                    // TODO: Auto-generated catch block
+                    System.out.println(
+                            "ServiceToAgent in run() method in runnable that is reading data from Service, was JSON exception.");
                     e.printStackTrace();
                 }
                 try {
                     Thread.sleep(10);
                 } catch (InterruptedException e) {
-                    // TODO: Auto-generated catch block
+                    System.out.println(
+                            "ServiceToAgent in run() method in runnable that is reading data from Service, Thread.sleep() was interrupted.");
                     e.printStackTrace();
                 }
             }
@@ -71,7 +77,8 @@ public class ServiceToAgent implements Runnable {
                 try {
                     Thread.sleep(10);
                 } catch (InterruptedException e) {
-                    // TODO: Auto-generated catch block
+                    System.out.println(
+                            "ServiceToAgent in run() method in runnable that is writing data to Service, Thread.sleep() was interrupted.");
                     e.printStackTrace();
                 }
             }

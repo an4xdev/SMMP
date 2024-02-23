@@ -1,0 +1,5 @@
+{
+	"java.project.sourcePaths": ["src"],
+	"java.project.outputPath": "bin",
+	"java.project.referencedLibraries": ["lib/**/*.jar", "c:\\Users\\An4x\\Desktop\\PROGRAMOWANIE\\TS\\my\\ServiceAPI\\ServiceAPI.jar"]
+}

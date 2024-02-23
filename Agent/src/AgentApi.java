@@ -10,6 +10,7 @@ import java.util.LinkedList;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 
+import org.json.JSONException;
 import org.json.JSONObject;
 
 import com.fasterxml.uuid.Generators;
@@ -95,7 +96,19 @@ public class AgentApi implements IAgentApi, Runnable {
 
     @Override
     public void sendMessage(JSONObject message) {
-        // get from connections list object with specific serviceID and send data, or send to Manager
+        try {
+            // get from connections list object with specific serviceID and send data, or send to Manager
+            connectionsToAgent.stream().filter(c -> c.getServiceID() == message.getInt("serviceID")).findFirst()
+                    .ifPresentOrElse(t -> t.sendMessage(message), () -> {
+                        System.out.println(
+                                "Agent in sendMessage() got data to send to Service with serviceID that's isn't connected to it. Data: "
+                                        + message.toString());
+                    });
+
+        } catch (JSONException e) {
+            System.out.println("Agent in sendMessage() got data to Manager.");
+            dataToManager.add(message);
+        }
     }
 
     @Override

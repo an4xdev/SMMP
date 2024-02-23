@@ -52,7 +52,8 @@ public class ServiceApi extends Thread implements IServiceApi {
             connectToAgent(params);
         } catch (IOException e) {
             System.out.println(
-                    String.format("ServiceApi with ID: %d, in start() failed to connect to Agent. Sending data to Manager",
+                    String.format(
+                            "ServiceApi with ID: %d, in start() failed to connect to Agent. Sending data to Manager",
                             serviceID));
             JSONObject dataToConnectToManager = params.getJSONObject("emergencyData");
             try (Socket socketToManager = new Socket(dataToConnectToManager.getString("managerNetwork"),
@@ -173,7 +174,8 @@ public class ServiceApi extends Thread implements IServiceApi {
                         Thread.sleep(10);
                     } catch (InterruptedException e) {
                         System.out.println(String.format(
-                                "ServiceApi with ID: %d, in receiveResponse() Thread.sleep() was interrupted", serviceID));
+                                "ServiceApi with ID: %d, in receiveResponse() Thread.sleep() was interrupted",
+                                serviceID));
                         e.printStackTrace();
                     }
                 }
