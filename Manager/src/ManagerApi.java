@@ -23,13 +23,19 @@ public class ManagerApi implements IManagerApi, Runnable {
     }
 
     @Override
-    public void start(JSONObject arg0) {
+    public void run() {
+        // TODO Auto-generated method stub
+        throw new UnsupportedOperationException("Unimplemented method 'run'");
+    }
+
+    @Override
+    public void start(JSONObject args) {
         // TODO Auto-generated method stub
         throw new UnsupportedOperationException("Unimplemented method 'start'");
     }
 
     @Override
-    public void sendData(JSONObject arg0) {
+    public void sendData(JSONObject message) {
         // TODO Auto-generated method stub
         throw new UnsupportedOperationException("Unimplemented method 'sendData'");
     }
@@ -43,12 +49,6 @@ public class ManagerApi implements IManagerApi, Runnable {
     @Override
     public String UUIDGenerator() {
         return Generators.timeBasedEpochGenerator().generate().toString();
-    }
-
-    @Override
-    public void run() {
-        // TODO Auto-generated method stub
-        throw new UnsupportedOperationException("Unimplemented method 'run'");
     }
 
 }

@@ -1,4 +1,4 @@
-import java.util.ArrayList;
+import java.util.List;
 
 /**
  * Class that contains informations about Service and it's plugs.
@@ -55,8 +55,8 @@ public abstract class AbstractService<T, K, L> {
     /**
      * Return all plugs from that Service.
      * 
-     * @return list in {@code ArrayList<L>} type.
+     * @return list in {@code List<L>} type.
      */
-    public abstract ArrayList<L> getAllPlugs();
+    public abstract List<L> getAllPlugs();
 
 }

@@ -1,4 +1,4 @@
-import java.util.ArrayList;
+import java.util.List;
 
 /**
  * Interface for implemening checking activity of plugs.
@@ -11,5 +11,5 @@ public interface IManagerCheckPlugsActivity<T> {
      * 
      * @param plugs
      */
-    public void checkPlugsActivity(ArrayList<T> plugs);
+    public void checkPlugsActivity(List<T> plugs);
 }

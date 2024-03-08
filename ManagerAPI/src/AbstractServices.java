@@ -1,10 +1,9 @@
-import java.util.ArrayList;
+import java.util.List;
 
 import org.json.JSONObject;
 
 /**
- * Class thats will be containing informations about all Services that were or
- * are running.
+ * Class thats will be containing informations about all Services that were or are running.
  * 
  * @param T - type of plug identifier.
  * @param K - type of service identifier.
@@ -45,8 +44,8 @@ public abstract class AbstractServices<T, K, L> {
     /**
      * Return all plugs. Needed for checking plugs activity.
      * 
-     * @return list of all plugs in {@code ArrayList<L>} type.
+     * @return list of all plugs in {@code List<L>} type.
      */
-    public abstract ArrayList<L> getAllPlugs();
+    public abstract List<L> getAllPlugs();
 
 }

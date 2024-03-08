@@ -11,9 +11,8 @@ public class Service extends AbstractService<Integer, Integer, Plug> {
         plugs = new ArrayList<>();
     }
 
-    @Override
-    public void changeStateOfPlug(Integer arg0) {
-        plugs.stream().filter(p -> p.getPlugPort() == arg0).findFirst().ifPresent(c -> c.changeStateOfPlug());
+    public LocalDateTime getLastUsedService() {
+        return lastUsedService;
     }
 
     @Override
@@ -21,21 +20,26 @@ public class Service extends AbstractService<Integer, Integer, Plug> {
         return plugs;
     }
 
-    @Override
-    public boolean isPlugInService(Integer arg0) {
-        return plugs.stream().anyMatch(p -> p.getPlugPort() == arg0);
+    private void updateServiceLastUsedTime() {
+        lastUsedService = LocalDateTime.now();
     }
 
     @Override
-    public void updateLastUsedPlug(Integer arg0) {
-        plugs.stream().filter(p -> p.getPlugPort() == arg0).findFirst().ifPresent(f -> {
+    public void changeStateOfPlug(Integer plugIdentifier) {
+        plugs.stream().filter(p -> p.getPlugPort() == plugIdentifier).findFirst().ifPresent(c -> c.changeStateOfPlug());
+    }
+
+    @Override
+    public void updateLastUsedPlug(Integer plugIdentifier) {
+        plugs.stream().filter(p -> p.getPlugPort() == plugIdentifier).findFirst().ifPresent(f -> {
             f.updateLastUsedPlug();
             updateServiceLastUsedTime();
         });
     }
 
-    private void updateServiceLastUsedTime() {
-        lastUsedService = LocalDateTime.now();
+    @Override
+    public boolean isPlugInService(Integer plugIdentifier) {
+        return plugs.stream().anyMatch(p -> p.getPlugPort() == plugIdentifier);
     }
 
 }

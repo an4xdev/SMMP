@@ -13,40 +13,43 @@ public class ServiceList extends AbstractServices<Integer, Integer, Plug> {
     }
 
     @Override
-    public void extendTypesOfService(JSONObject arg0) {
-        // TODO Auto-generated method stub
-        throw new UnsupportedOperationException("Unimplemented method 'extendTypesOfService'");
-    }
-
-    @Override
-    public boolean isServiceWithServiceID(Integer arg0) {
-        return services.values().stream().anyMatch(s -> s.stream().anyMatch(service -> service.getServiceID() == arg0));
-    }
-
-    @Override
-    public boolean isServiceWithPlug(Integer arg0) {
-        return services.values().stream().anyMatch(s -> s.stream().anyMatch(service -> service.isPlugInService(arg0)));
-    }
-
-    @Override
-    public void updateLastUsedPlug(Integer arg0) {
-        services.values()
-                .forEach(h -> h
-                        .stream()
-                        .filter(f -> f.isPlugInService(arg0))
-                        .findFirst()
-                        .ifPresent(s -> s.updateLastUsedPlug(arg0)));
-    }
-
-    @Override
-    public ArrayList<Plug> getAllPlugs() {
-        // TODO: change in API to List
-
-        return (ArrayList<Plug>) services.values().stream()
+    public List<Plug> getAllPlugs() {
+        return services.values().stream()
                 .flatMap(List::stream)
                 .flatMap(s -> s.getAllPlugs().stream())
                 .collect(Collectors.toList());
 
+    }
+
+    @Override
+    public void updateLastUsedPlug(Integer plugIdentifier) {
+        services.values()
+                .forEach(h -> h
+                        .stream()
+                        .filter(f -> f.isPlugInService(
+                                plugIdentifier))
+                        .findFirst()
+                        .ifPresent(s -> s.updateLastUsedPlug(plugIdentifier)));
+    }
+
+    @Override
+    public boolean isServiceWithPlug(Integer plugIdentifier) {
+        return services.values().stream().anyMatch(s -> s.stream().anyMatch(service -> service.isPlugInService(
+                plugIdentifier)));
+    }
+
+    @Override
+    public boolean isServiceWithServiceID(Integer serviceID) {
+
+        return services.values().stream()
+                .anyMatch(s -> s.stream().anyMatch(service -> service.getServiceID() == serviceID));
+
+    }
+
+    @Override
+    public void extendTypesOfService(JSONObject typesOfServices) {
+        // TODO Auto-generated method stub
+        throw new UnsupportedOperationException("Unimplemented method 'extendTypesOfService'");
     }
 
 }
