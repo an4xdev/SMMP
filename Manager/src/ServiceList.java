@@ -48,8 +48,14 @@ public class ServiceList extends AbstractServices<Integer, Integer, Plug> {
 
     @Override
     public void extendTypesOfService(JSONObject typesOfServices) {
-        // TODO Auto-generated method stub
-        throw new UnsupportedOperationException("Unimplemented method 'extendTypesOfService'");
+        // TODO: do something with types of Plugs, some Services may have only out or only in, some  Services may have in and out
+
+        for (String serviceType : typesOfServices.keySet()) {
+            JSONObject service = typesOfServices.getJSONObject(serviceType);
+            String name = service.getString("name");
+            services.put(name, new ArrayList<Service>());
+        }
+
     }
 
 }

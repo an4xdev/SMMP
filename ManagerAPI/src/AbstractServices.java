@@ -5,8 +5,8 @@ import org.json.JSONObject;
 /**
  * Class thats will be containing informations about all Services that were or are running.
  * 
- * @param T - type of plug identifier.
- * @param K - type of service identifier.
+ * @param T - type of Service identifier.
+ * @param K - type of Plug identifier.
  * @param L - type of Plug implementation.
  */
 public abstract class AbstractServices<T, K, L> {
@@ -21,25 +21,25 @@ public abstract class AbstractServices<T, K, L> {
     /**
      * Check if Service with specific plug is in all Services
      * 
-     * @param plugIdentifier
+     * @param plugIdentifier in {@code K} type.
      * @return {@code true} if plug is, otherwise {@code false}.
      */
-    public abstract boolean isServiceWithPlug(T plugIdentifier);
+    public abstract boolean isServiceWithPlug(K plugIdentifier);
 
     /**
      * Check if Service with identifier is in all Services
      * 
-     * @param serviceID
+     * @param serviceID in {@code T} type.
      * @return {@code true} if Service is, otherwise {@code false}.
      */
-    public abstract boolean isServiceWithServiceID(K serviceID);
+    public abstract boolean isServiceWithServiceID(T serviceID);
 
     /**
      * Update last used time of activity of plug and also of Service
      * 
-     * @param plugIdentifier
+     * @param plugIdentifier in {@code K} type. 
      */
-    public abstract void updateLastUsedPlug(T plugIdentifier);
+    public abstract void updateLastUsedPlug(K plugIdentifier);
 
     /**
      * Return all plugs. Needed for checking plugs activity.

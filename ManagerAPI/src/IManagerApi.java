@@ -1,6 +1,12 @@
+import java.util.concurrent.Future;
+
 import org.json.JSONObject;
 
-public interface IManagerApi {
+/**
+ * Interface to implement that cointains functions that are required, so Manager can work properly.
+ * @param S - type of Agent identifier. 
+ */
+public interface IManagerApi<S> {
     /**
      * Start Manager with data needed for setup.
      * 
@@ -13,14 +19,14 @@ public interface IManagerApi {
      * 
      * @param message - message in {@code JSONObject}.
      */
-    public void sendData(JSONObject message);
+    public void sendData(JSONObject message, S agentID);
 
     /**
      * Receive data to process.
      * 
-     * @return {@code JSONObject} with data.
+     * @return {@code Future<JSONObject>} with data.
      */
-    public JSONObject receiveDataToProcess();
+    public Future<JSONObject> receiveDataToProcess();
 
     /**
      * Generate time based UUID.

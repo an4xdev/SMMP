@@ -3,54 +3,66 @@ import java.util.List;
 /**
  * Class that contains informations about Service and it's plugs.
  * 
- * @param T - type of plug identifier.
- * @param K - type of Service identifier.
+ * @param S - type of Agent identifier.
+ * @param T - type of Service identifier.
+ * @param K - type of Plug identifier.
  * @param L - type of Plug implementation.
  */
 
-public abstract class AbstractService<T, K, L> {
+public abstract class AbstractService<S, T, K, L> {
 
-    private K serviceID;
+    private T serviceID;
+
+    private S agentID;
 
     /**
-     * Contructor that require Service identifier in {@code K} type.
+     * Contructor that require Service identifier in {@code T} type.
      * 
-     * @param serviceID
+     * @param serviceID in {@code T} type
      */
-    public AbstractService(K serviceID) {
+    public AbstractService(T serviceID, S agentID) {
         this.serviceID = serviceID;
+        this.agentID = agentID;
     }
 
     /**
      * Update last used time of activity of plug.
      * 
-     * @param plugIdentifier
+     * @param plugIdentifier in {@code K} type.
      */
-    public abstract void updateLastUsedPlug(T plugIdentifier);
+    public abstract void updateLastUsedPlug(K plugIdentifier);
 
     /**
      * Check if Service contains plug with specific identifier.
      * 
-     * @param plugIdentifier
+     * @param plugIdentifier in {@code K} type.
      * @return - {@code true} if contains, otherwise {@code false}.
      */
-    public abstract boolean isPlugInService(T plugIdentifier);
+    public abstract boolean isPlugInService(K plugIdentifier);
 
     /**
      * Getter of Service identifier.
      * 
-     * @return identifier in {@code K} type.
+     * @return identifier in {@code T} type.
      */
-    public K getServiceID() {
+    public T getServiceID() {
         return serviceID;
+    }
+
+    /**
+     * Getter of Agent identifier.
+     * @return identifier in {@code S} type.
+     */
+    public S getAgentID() {
+        return agentID;
     }
 
     /**
      * Change status of plug ex. connected/not connected, running/not running.
      * 
-     * @param plugIdentifier
+     * @param plugIdentifier in {@code K} type.
      */
-    public abstract void changeStateOfPlug(T plugIdentifier);
+    public abstract void changeStateOfPlug(K plugIdentifier);
 
     /**
      * Return all plugs from that Service.

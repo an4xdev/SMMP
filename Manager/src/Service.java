@@ -1,13 +1,13 @@
 import java.time.LocalDateTime;
 import java.util.ArrayList;
 
-public class Service extends AbstractService<Integer, Integer, Plug> {
+public class Service extends AbstractService<Integer, Integer, Integer, Plug> {
 
     private ArrayList<Plug> plugs;
     private LocalDateTime lastUsedService;
 
-    public Service(Integer serviceID) {
-        super(serviceID);
+    public Service(Integer serviceID, Integer agentID) {
+        super(serviceID, agentID);
         plugs = new ArrayList<>();
     }
 
